@@ -652,7 +652,7 @@ func voiceAction(text string) (string, string, bool) {
 	q := normalize(text)
 	q = strings.TrimSpace(strings.TrimPrefix(q, "алиса "))
 	q = strings.TrimSpace(strings.TrimSuffix(q, " пожалуйста"))
-	for _, phrase := range []string{"включи музыку на ютубе", "поставь музыку на ютубе", "включи музыку в youtube music", "включи рекомендации", "включи рекомендации на ютубе", "включи youtube music", "включи ютуб музыку"} {
+	for _, phrase := range []string{"включи музыку на ютубе", "поставь музыку на ютубе", "включи музыку в youtube music", "включи музыку на youtube", "поставь музыку на youtube", "включи музыку в ютубе", "включи музыку в youtube", "включи рекомендации на youtube", "включи музыку на youtube music", "включи рекомендации", "включи рекомендации на ютубе", "включи youtube music", "включи ютуб музыку"} {
 		if q == phrase {
 			return "recommendations", "", true
 		}
@@ -666,43 +666,45 @@ func voiceAction(text string) (string, string, bool) {
 	if q == "поставь мои лайки" || q == "включи мои лайки" || q == "включи понравившиеся" {
 		return "play", "мои лайки", true
 	}
-	controls := map[string]string{"дальше": "next", "следующий трек": "next", "следующая песня": "next", "назад": "previous", "предыдущий трек": "previous", "предыдущая песня": "previous", "пауза": "pause", "поставь на паузу": "pause", "продолжи": "resume", "продолжи музыку": "resume", "стоп": "stop", "выключи музыку": "stop", "выключи ютуб": "stop", "что сейчас играет": "what", "что играет": "what"}
+	controls := map[string]string{"дальше": "next", "следующий трек": "next", "следующая песня": "next", "следующую песню": "next","назад": "previous", "предыдущий трек": "previous", "предыдущая песня": "previous", "пауза": "pause", "поставь на паузу": "pause", "продолжи": "resume", "продолжи музыку": "resume", "стоп": "stop", "выключи музыку": "stop", "выключи ютуб": "stop", "что сейчас играет": "what", "что играет": "what"}
 	if a, ok := controls[q]; ok {
 		return a, "", true
 	}
-	for _, p := range []string{"включи на ютубе ", "включи в ютубе ", "включи на youtube ", "включи youtube music ", "включи ютуб музыку ", "включи ютуб ", "поставь на ютубе ", "поставь в ютубе ", "поставь на youtube ", "поставь youtube music ", "поставь ютуб ", "ютуб музыка ", "youtube music "} {
+	// Local patch: only requests that name YouTube go to YouTube Music.
+	// Generic "включи песню X" / "поставь X" stay with Alice (Yandex Music).
+	for _, p := range []string{"включи на ютубе ", "включи в ютубе ", "включи на youtube ", "включи в youtube ", "включи youtube music ", "включи ютуб музыку ", "включи ютуб ", "включи youtube ", "поставь на ютубе ", "поставь в ютубе ", "поставь на youtube ", "поставь в youtube ", "поставь youtube music ", "поставь ютуб ", "поставь youtube ", "ютуб музыка ", "youtube music "} {
 		if strings.HasPrefix(q, p) {
-			query := strings.TrimSpace(q[len(p):])
-			if query != "" {
+			if query := youtubeQuery(q[len(p):]); query != "" {
 				return "play", query, true
 			}
 		}
 	}
-	for _, verb := range []string{"поставь ", "включи "} {
+	// "включи песню X на ютубе" — YouTube named at the end.
+	for _, verb := range []string{"включи ", "поставь "} {
 		if !strings.HasPrefix(q, verb) {
 			continue
 		}
-		query := strings.TrimSpace(strings.TrimPrefix(q, verb))
-		// Explicit music nouns take precedence: a song may itself contain words
-		// such as "свет" or "таймер". Retain album/playlist nouns for the catalog.
-		for _, noun := range []string{"песню ", "трек ", "композицию ", "музыку ", "альбом ", "плейлист "} {
-			if strings.HasPrefix(query, noun) {
-				if noun != "альбом " && noun != "плейлист " {
-					query = strings.TrimSpace(strings.TrimPrefix(query, noun))
-				}
-				if query != "" {
+		for _, suffix := range []string{" на ютубе", " в ютубе", " на youtube", " в youtube", " на youtube music", " в youtube music"} {
+			if strings.HasSuffix(q, suffix) && len(q) > len(verb)+len(suffix) {
+				if query := youtubeQuery(q[len(verb) : len(q)-len(suffix)]); query != "" {
 					return "play", query, true
 				}
 			}
 		}
-		// Bare "включи" can name an arbitrary smart-home device or scene.
-		// "Поставь <artist/title>" is the shorthand for music; native device,
-		// timer and built-in content requests still belong to Alice.
-		if verb == "поставь " && query != "" && !nativeVoiceTarget(query) {
-			return "play", query, true
-		}
 	}
 	return "", "", false
+}
+
+// youtubeQuery drops "песню/трек/композицию" but keeps "альбом/плейлист",
+// which the catalog uses to choose the search type.
+func youtubeQuery(query string) string {
+	query = strings.TrimSpace(query)
+	for _, noun := range []string{"песню ", "трек ", "композицию "} {
+		if strings.HasPrefix(query, noun) {
+			return strings.TrimSpace(query[len(noun):])
+		}
+	}
+	return query
 }
 
 func nativeVoiceTarget(query string) bool {

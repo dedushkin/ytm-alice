@@ -33,26 +33,36 @@ func TestVoiceRouting(t *testing.T) {
 }
 
 func TestVoiceMusicShorthandAndNativeBoundaries(t *testing.T) {
+	// Local patch: YouTube only when the phrase names it.
 	for _, tc := range []struct{ phrase, query string }{
-		{"Алиса поставь sewerslvt newlove", "sewerslvt newlove"},
-		{"Алиса, поставь Sewerslvt Newlove, пожалуйста!", "sewerslvt newlove"},
-		{"поставь песню Sewerslvt Newlove", "sewerslvt newlove"},
-		{"включи трек Sewerslvt Newlove", "sewerslvt newlove"},
 		{"поставь на ютубе Sewerslvt Newlove", "sewerslvt newlove"},
-		{"поставь альбом Random Access Memories", "альбом random access memories"},
-		{"включи плейлист jazz", "плейлист jazz"},
-		{"поставь песню таймер", "таймер"},
+		{"Алиса, включи на YouTube песню Sewerslvt Newlove, пожалуйста!", "sewerslvt newlove"},
+		{"включи YouTube Muse", "muse"},
+		{"включи песню Sewerslvt Newlove на ютубе", "sewerslvt newlove"},
+		{"поставь трек Numb на youtube", "numb"},
+		{"включи на ютубе альбом Random Access Memories", "альбом random access memories"},
+		{"включи плейлист jazz на youtube", "плейлист jazz"},
+		{"включи мои лайки", "мои лайки"},
 	} {
 		a, query, ok := voiceAction(tc.phrase)
 		if !ok || a != "play" || query != tc.query {
 			t.Fatalf("%q => %q %q %v", tc.phrase, a, query, ok)
 		}
 	}
+	for _, phrase := range []string{"включи музыку на youtube", "Включи рекомендации", "включи музыку в ютубе"} {
+		if a, _, ok := voiceAction(phrase); !ok || a != "recommendations" {
+			t.Fatalf("%q => %q %v", phrase, a, ok)
+		}
+	}
 	for _, phrase := range []string{
+		"Алиса поставь sewerslvt newlove", "поставь песню Sewerslvt Newlove", "включи трек Numb",
+		"включи музыку для бега", "поставь альбом Random Access Memories", "включи плейлист jazz",
+		"включи Daft Punk", "поставь Daft Punk",
 		"поставь таймер на пять минут", "поставь пять минут", "поставь на завтра будильник",
 		"поставь будильник на семь", "поставь напоминание", "поставь громкость на двадцать",
 		"поставь двадцать градусов", "включи свет", "включи кухню", "включи радио",
 		"поставь радио", "поставь сказку", "поставь музыку", "включи музыку", "включи мою волну",
+		"включи музыку с сайта example.com", "включи в ютубе", "включи на youtube",
 		"поставь", "Алиса, какая погода?",
 	} {
 		if a, query, ok := voiceAction(phrase); ok {
@@ -61,6 +71,9 @@ func TestVoiceMusicShorthandAndNativeBoundaries(t *testing.T) {
 	}
 	if a, _, ok := voiceAction("поставь на паузу"); !ok || a != "pause" {
 		t.Fatal("shorthand shadowed pause control")
+	}
+	if a, _, ok := voiceAction("следующую песню"); !ok || a != "next" {
+		t.Fatal("next song control missing")
 	}
 }
 
